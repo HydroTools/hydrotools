@@ -77,7 +77,7 @@ class MockRequests:
 ##### FIXTURES #####
 
 @pytest.fixture(name="IVDataServiceWithTempCache")
-def wrap_iv_cache_location_to_temp(loop):
+def wrap_iv_cache_location_to_temp(event_loop):
     from tempfile import TemporaryDirectory
     from pathlib import Path
     from functools import partial
@@ -87,7 +87,7 @@ def wrap_iv_cache_location_to_temp(loop):
 
         o = partial(iv.IVDataService, cache_filename=cache_file)
         return o
-    
+
 
 @pytest.fixture
 def setup_iv(IVDataServiceWithTempCache):
@@ -119,7 +119,7 @@ def mocked_iv(mock_iv, setup_iv):
     `iv.IVDataService`'s `get_raw` method has been mocked to return an empty list.
     """
     return setup_iv
-    
+
 
 simplify_variable_test_data = [
     ("test", ",", "test"),
@@ -184,6 +184,13 @@ def test_get_value_time(setup_iv_value_time, sites, validation):
     assert df["usgs_site_code"].isin(validation).all()
     assert "value_time" in df
 
+
+@pytest.mark.slow
+def test_get_with_expanded_metadata(setup_iv):
+    """Test expanded metadata option"""
+    df = setup_iv.get(sites=["01646500"], parameterCd="00060", include_expanded_metadata=True)
+    assert (df["huc_code"] == "02070008").all()
+
 def test_get_raw_with_mock(setup_iv, monkeypatch):
     """Test data retrieval and parsing"""
     import json
@@ -201,6 +208,52 @@ def test_get_raw_with_mock(setup_iv, monkeypatch):
 
     data = setup_iv.get_raw(sites="01646500", parameterCd="00060,00065")
     assert data[0]["usgs_site_code"] == "01646500"
+
+def test_expanded_metadata(setup_iv, monkeypatch):
+    """Test data retrieval and parsing"""
+    import json
+    from pathlib import Path
+    from hydrotools._restclient import RestClient
+
+    def requests_mock(*args, **kwargs):
+        json_text = json.loads(
+            (Path(__file__).resolve().parent / "nwis_test_data.json").read_text()
+        )
+        # key_word_args = {"_json": json_text}
+        return MockRequests(_json=json_text)
+
+    monkeypatch.setattr(RestClient, "get", requests_mock)
+
+    data = setup_iv.get_raw(sites="01646500", parameterCd="00060,00065", include_expanded_metadata=True)
+    assert data[0]["hucCd"] == "02070008"
+
+def test_expanded_metadata_columns(setup_iv, monkeypatch):
+    """Test data retrieval and parsing"""
+    import json
+    from pathlib import Path
+    from hydrotools._restclient import RestClient
+
+    def requests_mock(*args, **kwargs):
+        json_text = json.loads(
+            (Path(__file__).resolve().parent / "nwis_test_data.json").read_text()
+        )
+        # key_word_args = {"_json": json_text}
+        return MockRequests(_json=json_text)
+
+    monkeypatch.setattr(RestClient, "get", requests_mock)
+
+    data = setup_iv.get(sites="01646500", parameterCd="00060,00065", include_expanded_metadata=True)
+    extra_columns = [
+        "site_type_code",
+        "huc_code",
+        "county_code",
+        "state_code",
+        "site_name",
+        "latitude",
+        "longitude"
+        ]
+    for c in extra_columns:
+        assert c in data.columns
 
 
 def test_handle_response(setup_iv, monkeypatch):
@@ -487,7 +540,7 @@ def test_nwis_client_get_throws_warning_for_kwargs(mocked_iv):
         mocked_iv.get(sites=["01189000"], startDt="2022-01-01")
 
 @pytest.mark.slow
-def test_nwis_client_cache_path(loop):
+def test_nwis_client_cache_path(event_loop):
     """verify that cache directory has configurable location"""
     from tempfile import TemporaryDirectory
     from pathlib import Path
@@ -502,3 +555,36 @@ def test_nwis_client_cache_path(loop):
 
         # close resources
         service._restclient.close()
+
+
+@pytest.mark.slow
+def test_nwis_client_context_manager(event_loop):
+    """verify that context manager closes resources"""
+    with iv.IVDataService() as service:
+        service.get(sites=["01189000"], startDT="2022-01-01")
+    assert service._restclient._session.closed
+    # should this be closed? The assertion fails if uncommented
+    # assert service._restclient._loop.is_closed()
+
+
+def test_fixes_209(event_loop, monkeypatch):
+    """
+    verify that pandas FutureWarning is not raised by `IVDataService.get`. This FutureWarning was
+    introduced in 1.5.1. see pandas changelog
+    https://pandas.pydata.org/docs/whatsnew/v1.5.0.html#inplace-operation-when-setting-values-with-loc-and-iloc
+    for more information.
+    """
+    import warnings
+
+    def mock_get_raw(*args, **kwargs):
+        return [{'usgs_site_code': '01646500', 'variableName': 'streamflow', 'measurement_unit': 'ft3/s', 'values': [{'value': '18300', 'qualifiers': ['A'], 'dateTime': '2020-12-31T20:00:00.000-05:00'}, {'value': '18200', 'qualifiers': ['A'], 'dateTime': '2020-12-31T20:15:00.000-05:00'}], 'series': 0}]
+
+    monkeypatch.setattr(iv.IVDataService, "get_raw", mock_get_raw)
+    client = iv.IVDataService(enable_cache=False)
+
+    # fail if ANY warning. this should probably be more specific, but if we get any warnings, we
+    # should resolve them.
+    with warnings.catch_warnings():
+        # warning will be raised to exception if caught
+        warnings.simplefilter("error")
+        client.get(sites='01646500', startDT="2021-01-01T01:00", endDT="2021-01-01T01:15")

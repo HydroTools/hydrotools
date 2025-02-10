@@ -1,4 +1,10 @@
-![Unit Testing Status](https://github.com/noaa-owp/hydrotools/actions/workflows/run_unit_tests.yml/badge.svg)
+![hydrotools.events testing status](https://github.com/noaa-owp/hydrotools/actions/workflows/run_events.yml/badge.svg)
+![hydrotools.metrics testing status](https://github.com/noaa-owp/hydrotools/actions/workflows/run_metrics.yml/badge.svg)
+![hydrotools.nwis_client testing status](https://github.com/noaa-owp/hydrotools/actions/workflows/run_nwis_client.yml/badge.svg)
+![hydrotools.nwm_client testing status](https://github.com/noaa-owp/hydrotools/actions/workflows/run_nwm_client.yml/badge.svg)
+![hydrotools._restclient testing status](https://github.com/noaa-owp/hydrotools/actions/workflows/run_rest_client.yml/badge.svg)
+![hydrotools.svi_client testing status](https://github.com/noaa-owp/hydrotools/actions/workflows/run_svi_client.yml/badge.svg)
+![weekly unit tests](https://github.com/noaa-owp/hydrotools/actions/workflows/run_slow_unit_tests.yml/badge.svg)
 
 ![OWPHydroTools](https://raw.githubusercontent.com/NOAA-OWP/hydrotools/main/docs/banner.png)
 
@@ -24,8 +30,9 @@ Currently the repository has the following subpackages:
 - `nwm_client`: Provides methods for retrieving National Water Model data from various sources including [Google Cloud Platform](https://console.cloud.google.com/marketplace/details/noaa-public/national-water-model) and [NOMADS](https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwm/prod/)
 - `metrics`: Variety of methods used to compute common evaluation metrics
 - `nwis_client`: Provides easy to use methods for retrieving data from the [USGS NWIS Instantaneous Values (IV) Web Service](https://waterservices.usgs.gov/rest/IV-Service.html)
+- `svi_client`: Provides programmatic access to the Center for Disease Control's (CDC) [Social Vulnerability Index (SVI)](https://www.atsdr.cdc.gov/placeandhealth/svi/index.html)
+
 - `_restclient`: A generic REST client with built in cache that make the construction and retrieval of GET requests painless
-- `caches`: Provides a variety of object caching utilities
 
 ## UTC Time
 
@@ -134,3 +141,6 @@ This limits `groupby` operations to category values that actually appear in the 
 ```python
 mean_flow = my_dataframe.groupby('usgs_site_code', observed=True).mean()
 ```
+
+## American Geophysical Union 2021 Fall Meeting Poster
+[OWPHydroTools_AGU2021.pdf](https://github.com/NOAA-OWP/OWP-Presentations/blob/main/AGU/AGU%202021/Poster%20Presentations/Regina_AGU_2021.pdf)
